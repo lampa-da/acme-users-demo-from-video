@@ -1,40 +1,29 @@
-const Sequelize = require('sequelize')
-const faker = require ('faker')
-const {STRING, TEXT} = Sequelize
-const db = new Sequelize(process.env.DATABASE_URL || 'postgres://localhost/acme_users_db1');
+const { db, syncAndSeed, models: {User}} = require('./db')
+const express = require('express')
+const path = require('path')
 
-const User = db.define('User', {
-  email: {
-    type:STRING,
-    allowNull: false,
-    validate:{
-      isEmail: true
-    }
-  },
-  bio:{
-    type: TEXT
-  }
-});
+const app = express()
 
-User.beforeSave ( user => {
-  if(!user.bio){
-    user.bio = `${user.email} BIO is ${faker.lorem.paragraphs(3)}`
-  }
-})
+app.use(express.urlencoded({extended: false}))
+app.use(require('method-override')('_method'));
 
-const syncAndSeed = async()=>{
-  await db.sync({force: true})
-  await User.create({email: 'moe@gmail.com', bio: "Moe's bio"})
-  await User.create({email: 'lucy@yahoo.com'})
-  await User.create({email: 'ethyl@aol.com'})
-}
+app.get('/styles.css', (req, res)=> res.sendFile(path.join(__dirname, 'styles.css')))
+
+app.get('/', (req, res)=> res.redirect('/users'))
+
+app.use('/users', require('./routes/users'))
 
 const init = async()=> {
   try{
 
     await db.authenticate();
-    await syncAndSeed()
-    // console.log(await User.findAll());
+    if(process.env.SYNC){
+      await syncAndSeed()
+    }
+    await syncAndSeed();
+    await User.findAll()
+    const port =process.env.PORT || 3000
+    app.listen(port, ()=> console.log(`listening on port ${port}`))
   }
   catch(ex){
     console.log(ex)
